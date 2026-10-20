@@ -16,7 +16,7 @@ class NutritionGoalNotifier extends AsyncNotifier<NutritionGoal?> {
 
   Future<void> save(NutritionGoal goal) async {
     await ref.read(nutritionGoalRepositoryProvider).save(goal);
-    state = AsyncData(goal);
+    state = AsyncData(await ref.read(nutritionGoalRepositoryProvider).get());
   }
 }
 

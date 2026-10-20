@@ -5,6 +5,7 @@ import '../domain/day.dart';
 import '../domain/diary_entry.dart';
 import '../providers/diary_providers.dart';
 import '../providers/selected_day_provider.dart';
+import 'format.dart';
 
 class DiaryTab extends ConsumerWidget {
   const DiaryTab({super.key});
@@ -60,7 +61,7 @@ class DiaryTab extends ConsumerWidget {
         final entry = forDay[index];
         return ListTile(
           title: Text(entry.text ?? ''),
-          subtitle: Text(_formatTime(entry.occurredAt)),
+          subtitle: Text(formatTime(entry.occurredAt)),
           trailing: IconButton(
             icon: const Icon(Icons.delete_outline),
             tooltip: 'Delete entry',
@@ -105,12 +106,6 @@ class DiaryTab extends ConsumerWidget {
             audioPath: entry.audioPath,
           ),
         );
-  }
-
-  static String _formatTime(DateTime t) {
-    final h = t.hour.toString().padLeft(2, '0');
-    final m = t.minute.toString().padLeft(2, '0');
-    return '$h:$m';
   }
 }
 
@@ -197,7 +192,7 @@ class _EntryDialogState extends State<_EntryDialog> {
           const SizedBox(height: 12),
           Row(
             children: [
-              Expanded(child: Text(_formatDateTime(_occurredAt))),
+              Expanded(child: Text('${formatDate(_occurredAt)} ${formatTime(_occurredAt)}')),
               TextButton.icon(
                 onPressed: _pickDateTime,
                 icon: const Icon(Icons.schedule),
@@ -218,13 +213,5 @@ class _EntryDialogState extends State<_EntryDialog> {
         ),
       ],
     );
-  }
-
-  static String _formatDateTime(DateTime t) {
-    final h = t.hour.toString().padLeft(2, '0');
-    final m = t.minute.toString().padLeft(2, '0');
-    final mm = t.month.toString().padLeft(2, '0');
-    final d = t.day.toString().padLeft(2, '0');
-    return '${t.year}-$mm-$d $h:$m';
   }
 }

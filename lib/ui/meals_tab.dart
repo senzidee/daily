@@ -10,6 +10,7 @@ import '../domain/meal.dart';
 import '../providers/food_providers.dart';
 import '../providers/meal_providers.dart';
 import '../providers/selected_day_provider.dart';
+import 'format.dart';
 
 final _foodQueryProvider = NotifierProvider<_FoodQueryNotifier, String>(
   _FoodQueryNotifier.new,
@@ -103,7 +104,11 @@ class _SearchResults extends ConsumerWidget {
               title: Text(food.name),
               subtitle: Text(_macrosLabel(food.per100g)),
               trailing: const Icon(Icons.add_circle_outline),
-              onTap: () => _showLogMealDialog(context, food),
+              onTap: () => _showLogMealDialog(
+                context,
+                food,
+                ref.read(selectedDayProvider),
+              ),
             );
           },
         );
@@ -177,27 +182,33 @@ class _MealTile extends ConsumerWidget {
         title: Text(name),
         isThreeLine: true,
         subtitle: Text(
-          '${_fmt(meal.grams)} g · ${_fmt(meal.macros.kcal)} kcal\n'
-          'C ${_fmt(meal.macros.carbs)} · P ${_fmt(meal.macros.protein)} · '
-          'F ${_fmt(meal.macros.fat)}',
+          '${formatValue(meal.grams)} g · ${formatValue(meal.macros.kcal)} kcal\n'
+          'C ${formatValue(meal.macros.carbs)} · '
+          'P ${formatValue(meal.macros.protein)} · '
+          'F ${formatValue(meal.macros.fat)}',
         ),
-        onTap: () => _showEditMealDialog(context, meal),
+        onTap: () => _showEditMealDialog(
+          context,
+          meal,
+          ref.read(selectedDayProvider),
+        ),
       ),
     );
   }
 }
 
-Future<void> _showLogMealDialog(BuildContext context, Food food) {
+Future<void> _showLogMealDialog(BuildContext context, Food food, DateTime day) {
   return showDialog<void>(
     context: context,
-    builder: (context) => _LogMealDialog(food: food),
+    builder: (context) => _LogMealDialog(food: food, day: day),
   );
 }
 
 class _LogMealDialog extends ConsumerStatefulWidget {
-  const _LogMealDialog({required this.food});
+  const _LogMealDialog({required this.food, required this.day});
 
   final Food food;
+  final DateTime day;
 
   @override
   ConsumerState<_LogMealDialog> createState() => _LogMealDialogState();
@@ -205,8 +216,21 @@ class _LogMealDialog extends ConsumerStatefulWidget {
 
 class _LogMealDialogState extends ConsumerState<_LogMealDialog> {
   final _gramsController = TextEditingController();
-  DateTime _time = DateTime.now();
+  late DateTime _consumedAt;
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    _consumedAt = DateTime(
+      widget.day.year,
+      widget.day.month,
+      widget.day.day,
+      now.hour,
+      now.minute,
+    );
+  }
 
   @override
   void dispose() {
@@ -242,9 +266,16 @@ class _LogMealDialogState extends ConsumerState<_LogMealDialog> {
           const SizedBox(height: 16),
           ListTile(
             contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.calendar_today),
+            title: const Text('Date'),
+            subtitle: Text(formatDate(_consumedAt)),
+            onTap: _pickDate,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.schedule),
             title: const Text('Time'),
-            subtitle: Text(_formatTime(_time)),
+            subtitle: Text(formatTime(_consumedAt)),
             onTap: _pickTime,
           ),
           if (preview != null) ...[
@@ -269,17 +300,37 @@ class _LogMealDialogState extends ConsumerState<_LogMealDialog> {
     );
   }
 
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_time),
+      initialDate: _consumedAt,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
     );
     if (picked != null) {
       setState(() {
-        _time = DateTime(
-          _time.year,
-          _time.month,
-          _time.day,
+        _consumedAt = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _consumedAt.hour,
+          _consumedAt.minute,
+        );
+      });
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_consumedAt),
+    );
+    if (picked != null) {
+      setState(() {
+        _consumedAt = DateTime(
+          _consumedAt.year,
+          _consumedAt.month,
+          _consumedAt.day,
           picked.hour,
           picked.minute,
         );
@@ -296,7 +347,7 @@ class _LogMealDialogState extends ConsumerState<_LogMealDialog> {
     await ref.read(mealsProvider.notifier).add(
           food: widget.food,
           grams: grams,
-          consumedAt: _time,
+          consumedAt: _consumedAt,
         );
     if (mounted) {
       Navigator.of(context).pop();
@@ -304,17 +355,19 @@ class _LogMealDialogState extends ConsumerState<_LogMealDialog> {
   }
 }
 
-Future<void> _showEditMealDialog(BuildContext context, Meal meal) {
+Future<void> _showEditMealDialog(
+    BuildContext context, Meal meal, DateTime day) {
   return showDialog<void>(
     context: context,
-    builder: (context) => _EditMealDialog(meal: meal),
+    builder: (context) => _EditMealDialog(meal: meal, day: day),
   );
 }
 
 class _EditMealDialog extends ConsumerStatefulWidget {
-  const _EditMealDialog({required this.meal});
+  const _EditMealDialog({required this.meal, required this.day});
 
   final Meal meal;
+  final DateTime day;
 
   @override
   ConsumerState<_EditMealDialog> createState() => _EditMealDialogState();
@@ -322,8 +375,14 @@ class _EditMealDialog extends ConsumerStatefulWidget {
 
 class _EditMealDialogState extends ConsumerState<_EditMealDialog> {
   late final TextEditingController _gramsController =
-      TextEditingController(text: _fmt(widget.meal.grams));
-  late DateTime _time = widget.meal.consumedAt;
+      TextEditingController(text: formatValue(widget.meal.grams));
+  late DateTime _consumedAt = DateTime(
+    widget.day.year,
+    widget.day.month,
+    widget.day.day,
+    widget.meal.consumedAt.hour,
+    widget.meal.consumedAt.minute,
+  );
   bool _submitting = false;
 
   @override
@@ -371,9 +430,16 @@ class _EditMealDialogState extends ConsumerState<_EditMealDialog> {
           const SizedBox(height: 16),
           ListTile(
             contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.calendar_today),
+            title: const Text('Date'),
+            subtitle: Text(formatDate(_consumedAt)),
+            onTap: _pickDate,
+          ),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
             leading: const Icon(Icons.schedule),
             title: const Text('Time'),
-            subtitle: Text(_formatTime(_time)),
+            subtitle: Text(formatTime(_consumedAt)),
             onTap: _pickTime,
           ),
           if (preview != null) ...[
@@ -398,17 +464,37 @@ class _EditMealDialogState extends ConsumerState<_EditMealDialog> {
     );
   }
 
-  Future<void> _pickTime() async {
-    final picked = await showTimePicker(
+  Future<void> _pickDate() async {
+    final picked = await showDatePicker(
       context: context,
-      initialTime: TimeOfDay.fromDateTime(_time),
+      initialDate: _consumedAt,
+      firstDate: DateTime(2000),
+      lastDate: DateTime(2100),
     );
     if (picked != null) {
       setState(() {
-        _time = DateTime(
-          _time.year,
-          _time.month,
-          _time.day,
+        _consumedAt = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _consumedAt.hour,
+          _consumedAt.minute,
+        );
+      });
+    }
+  }
+
+  Future<void> _pickTime() async {
+    final picked = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(_consumedAt),
+    );
+    if (picked != null) {
+      setState(() {
+        _consumedAt = DateTime(
+          _consumedAt.year,
+          _consumedAt.month,
+          _consumedAt.day,
           picked.hour,
           picked.minute,
         );
@@ -428,7 +514,7 @@ class _EditMealDialogState extends ConsumerState<_EditMealDialog> {
             foodId: widget.meal.foodId,
             grams: grams,
             macros: widget.meal.macros,
-            consumedAt: _time,
+            consumedAt: _consumedAt,
           ),
         );
     if (mounted) {
@@ -474,17 +560,6 @@ class _CenteredNote extends StatelessWidget {
   }
 }
 
-String _fmt(double value) {
-  final s = value.toStringAsFixed(1);
-  return s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
-}
-
-String _formatTime(DateTime time) {
-  final hour = time.hour.toString().padLeft(2, '0');
-  final minute = time.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
-}
-
 String _macrosLabel(Macros m) =>
-    '${_fmt(m.kcal)} kcal · C ${_fmt(m.carbs)} g · '
-    'P ${_fmt(m.protein)} g · F ${_fmt(m.fat)} g';
+    '${formatValue(m.kcal)} kcal · C ${formatValue(m.carbs)} g · '
+    'P ${formatValue(m.protein)} g · F ${formatValue(m.fat)} g';

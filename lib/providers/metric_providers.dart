@@ -18,7 +18,6 @@ final measurementRepositoryProvider = Provider<MeasurementRepository>(
 class MetricsNotifier extends AsyncNotifier<List<Metric>> {
   @override
   Future<List<Metric>> build() async {
-    await ref.read(databaseProvider).seedWeightIfEmpty();
     return ref.read(metricRepositoryProvider).getAll();
   }
 

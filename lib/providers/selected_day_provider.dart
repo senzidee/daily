@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/day.dart';
+
 final selectedDayProvider =
     NotifierProvider<SelectedDayNotifier, DateTime>(SelectedDayNotifier.new);
 
@@ -8,11 +10,11 @@ class SelectedDayNotifier extends Notifier<DateTime> {
   DateTime build() => _today();
 
   void goToPreviousDay() {
-    state = _dateOnly(state.subtract(const Duration(days: 1)));
+    state = dateOnly(state.subtract(const Duration(days: 1)));
   }
 
   void goToNextDay() {
-    state = _dateOnly(state.add(const Duration(days: 1)));
+    state = dateOnly(state.add(const Duration(days: 1)));
   }
 
   void goToToday() {
@@ -20,10 +22,8 @@ class SelectedDayNotifier extends Notifier<DateTime> {
   }
 
   void setDay(DateTime day) {
-    state = _dateOnly(day);
+    state = dateOnly(day);
   }
 
-  static DateTime _today() => _dateOnly(DateTime.now());
-
-  static DateTime _dateOnly(DateTime day) => DateTime(day.year, day.month, day.day);
+  static DateTime _today() => dateOnly(DateTime.now());
 }
