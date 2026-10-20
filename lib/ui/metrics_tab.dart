@@ -8,6 +8,7 @@ import '../domain/measurement.dart';
 import '../domain/metric.dart';
 import '../providers/metric_providers.dart';
 import '../providers/selected_day_provider.dart';
+import 'format.dart';
 
 class MetricsTab extends ConsumerWidget {
   const MetricsTab({super.key});
@@ -74,7 +75,7 @@ class _MetricTile extends StatelessWidget {
         .toList()
       ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
 
-    final aggregate = aggregateMetric(metric.aggregationMode, dayMeasurements);
+    final aggregate = aggregateMetric(dayMeasurements, metric.aggregationMode);
 
     return ExpansionTile(
       key: ValueKey(metric.id),
@@ -85,18 +86,18 @@ class _MetricTile extends StatelessWidget {
       children: [
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 8),
-          child: aggregate == null
+          child: dayMeasurements.isEmpty
               ? const Text('No measurements for this day')
               : Text(
                   '${metric.aggregationMode.name}: '
-                  '${_formatValue(aggregate)} ${metric.unit}',
+                  '${formatValue(aggregate)} ${metric.unit}',
                 ),
         ),
         for (final m in dayMeasurements)
           ListTile(
             dense: true,
-            title: Text('${_formatValue(m.value)} ${metric.unit}'),
-            subtitle: Text(_formatTime(m.recordedAt)),
+            title: Text('${formatValue(m.value)} ${metric.unit}'),
+            subtitle: Text(formatTime(m.recordedAt)),
           ),
         _AddMeasurementForm(metricId: metric.id!, day: day),
       ],
@@ -214,7 +215,7 @@ class _AddMeasurementFormState extends ConsumerState<_AddMeasurementForm> {
     if (value == null) return;
 
     final recordedAt = _time == null
-        ? DateTime.now()
+        ? widget.day
         : DateTime(
             widget.day.year,
             widget.day.month,
@@ -263,17 +264,4 @@ class _AddMeasurementFormState extends ConsumerState<_AddMeasurementForm> {
       ),
     );
   }
-}
-
-String _formatValue(double value) {
-  if (value == value.roundToDouble()) {
-    return value.toInt().toString();
-  }
-  return value.toString();
-}
-
-String _formatTime(DateTime time) {
-  final hour = time.hour.toString().padLeft(2, '0');
-  final minute = time.minute.toString().padLeft(2, '0');
-  return '$hour:$minute';
 }

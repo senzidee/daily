@@ -2,6 +2,7 @@ import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
 
 import '../domain/aggregation_mode.dart';
+import '../domain/day.dart';
 import 'tables.dart';
 
 part 'app_database.g.dart';
@@ -56,7 +57,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   Stream<List<DiaryEntryRow>> watchEntriesForDay(DateTime day) {
-    final start = DateTime(day.year, day.month, day.day);
+    final start = dateOnly(day);
     final end = start.add(const Duration(days: 1));
     return (select(diaryEntries)
           ..where(
@@ -119,7 +120,7 @@ class AppDatabase extends _$AppDatabase {
       (select(foods)..where((t) => t.id.equals(id))).getSingleOrNull();
 
   Stream<List<MealRow>> watchMealsForDay(DateTime day) {
-    final start = DateTime(day.year, day.month, day.day);
+    final start = dateOnly(day);
     final end = start.add(const Duration(days: 1));
     return (select(meals)
           ..where(

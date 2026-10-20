@@ -5,6 +5,7 @@ import '../domain/macros.dart';
 import '../domain/nutrition_goal.dart';
 import '../providers/daily_summary_provider.dart';
 import '../providers/goal_providers.dart';
+import 'format.dart';
 
 class SummaryTab extends ConsumerWidget {
   const SummaryTab({super.key});
@@ -21,7 +22,7 @@ class SummaryTab extends ConsumerWidget {
         children: [
           _GoalCard(
             goal: summary.goal,
-            consumedKcal: summary.consumedMacros.kcal,
+            consumed: summary.consumedMacros,
           ),
           const SizedBox(height: 16),
           const _SectionHeader('Metrics'),
@@ -35,7 +36,7 @@ class SummaryTab extends ConsumerWidget {
                     ListTile(
                       title: Text(
                         '${aggregate.metric.name}: '
-                        '${_fmt(aggregate.value)} ${aggregate.metric.unit}',
+                        '${formatValue(aggregate.value)} ${aggregate.metric.unit}',
                       ),
                       subtitle: Text(aggregate.metric.aggregationMode.name),
                     ),
@@ -52,10 +53,10 @@ class SummaryTab extends ConsumerWidget {
 }
 
 class _GoalCard extends ConsumerWidget {
-  const _GoalCard({required this.goal, required this.consumedKcal});
+  const _GoalCard({required this.goal, required this.consumed});
 
   final NutritionGoal? goal;
-  final double consumedKcal;
+  final Macros consumed;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -99,13 +100,14 @@ class _GoalCard extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text('${_fmt(goal.kcalTarget)} kcal target'),
+            Text('${formatValue(goal.kcalTarget)} kcal target'),
             const SizedBox(height: 8),
-            Text('Carbs ${_fmt(targets.carbs)} g'),
-            Text('Protein ${_fmt(targets.protein)} g'),
-            Text('Fat ${_fmt(targets.fat)} g'),
+            Text(_macroRemainingLabel('Carbs', consumed.carbs, targets.carbs)),
+            Text(_macroRemainingLabel(
+                'Protein', consumed.protein, targets.protein)),
+            Text(_macroRemainingLabel('Fat', consumed.fat, targets.fat)),
             const Divider(height: 24),
-            Text(_remainingLabel(consumedKcal, goal.kcalTarget)),
+            Text(_remainingLabel(consumed.kcal, goal.kcalTarget)),
           ],
         ),
       ),
@@ -126,11 +128,11 @@ class _MacrosCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('${_fmt(macros.kcal)} kcal'),
+            Text('${formatValue(macros.kcal)} kcal'),
             const SizedBox(height: 8),
-            Text('Carbs ${_fmt(macros.carbs)} g'),
-            Text('Protein ${_fmt(macros.protein)} g'),
-            Text('Fat ${_fmt(macros.fat)} g'),
+            Text('Carbs ${formatValue(macros.carbs)} g'),
+            Text('Protein ${formatValue(macros.protein)} g'),
+            Text('Fat ${formatValue(macros.fat)} g'),
           ],
         ),
       ),
@@ -198,16 +200,16 @@ class _GoalEditorDialogState extends ConsumerState<_GoalEditorDialog> {
     super.initState();
     final initial = widget.initial;
     _kcalController = TextEditingController(
-      text: initial == null ? '' : _fmt(initial.kcalTarget),
+      text: initial == null ? '' : formatValue(initial.kcalTarget),
     );
     _carbsController = TextEditingController(
-      text: initial == null ? '' : _fmt(initial.carbPercent),
+      text: initial == null ? '' : formatValue(initial.carbPercent),
     );
     _proteinController = TextEditingController(
-      text: initial == null ? '' : _fmt(initial.proteinPercent),
+      text: initial == null ? '' : formatValue(initial.proteinPercent),
     );
     _fatController = TextEditingController(
-      text: initial == null ? '' : _fmt(initial.fatPercent),
+      text: initial == null ? '' : formatValue(initial.fatPercent),
     );
   }
 
@@ -336,16 +338,21 @@ class _GoalEditorDialogState extends ConsumerState<_GoalEditorDialog> {
   }
 }
 
-String _fmt(double value) {
-  final s = value.toStringAsFixed(1);
-  return s.endsWith('.0') ? s.substring(0, s.length - 2) : s;
-}
-
 String _remainingLabel(double consumed, double target) {
   final diff = target - consumed;
-  final consumedText = '${_fmt(consumed)} of ${_fmt(target)} kcal consumed';
+  final consumedText =
+      '${formatValue(consumed)} of ${formatValue(target)} kcal consumed';
   if (diff >= 0) {
-    return '$consumedText — ${_fmt(diff)} kcal remaining';
+    return '$consumedText — ${formatValue(diff)} kcal remaining';
   }
-  return '$consumedText — ${_fmt(-diff)} kcal over';
+  return '$consumedText — ${formatValue(-diff)} kcal over';
+}
+
+String _macroRemainingLabel(String name, double consumed, double target) {
+  final diff = target - consumed;
+  final label = '$name ${formatValue(consumed)} of ${formatValue(target)} g';
+  if (diff >= 0) {
+    return '$label — ${formatValue(diff)} g remaining';
+  }
+  return '$label — ${formatValue(-diff)} g over';
 }

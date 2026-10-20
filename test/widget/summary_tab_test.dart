@@ -36,7 +36,7 @@ void main() {
 
     expect(find.text('2000 kcal target'), findsOneWidget);
     expect(find.text('Edit goal'), findsOneWidget);
-    expect(find.text('Carbs 200 g'), findsOneWidget);
+    expect(find.text('Carbs 0 of 200 g — 200 g remaining'), findsOneWidget);
   });
 
   testWidgets('shows aggregates and macros for a seeded day', (tester) async {

@@ -17,6 +17,7 @@ class DriftMetricRepository implements MetricRepository {
 
   @override
   Future<List<Metric>> getAll() async {
+    await _db.seedWeightIfEmpty();
     final rows = await (_db.select(_db.metrics)
           ..orderBy([(t) => OrderingTerm.asc(t.id)]))
         .get();
@@ -24,8 +25,9 @@ class DriftMetricRepository implements MetricRepository {
   }
 
   @override
-  Stream<List<Metric>> watchAll() {
-    return (_db.select(_db.metrics)
+  Stream<List<Metric>> watchAll() async* {
+    await _db.seedWeightIfEmpty();
+    yield* (_db.select(_db.metrics)
           ..orderBy([(t) => OrderingTerm.asc(t.id)]))
         .watch()
         .map((rows) => rows.map(_toMetric).toList());
