@@ -17,3 +17,7 @@ final foodRepositoryProvider = Provider<FoodRepository>(
 final foodSearchProvider = FutureProvider.family<List<Food>, String>(
   (ref, query) => ref.watch(foodRepositoryProvider).search(query),
 );
+
+final foodByIdProvider = FutureProvider.family<Food?, int>(
+  (ref, id) => ref.watch(foodRepositoryProvider).findById(id),
+);
