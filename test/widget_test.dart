@@ -1,3 +1,4 @@
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -5,7 +6,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:daylog/data/app_database.dart';
 import 'package:daylog/main.dart';
 import 'package:daylog/providers/database_provider.dart';
-import 'package:drift/native.dart';
 
 void main() {
   testWidgets('shell builds and next-day control changes the selected day',
