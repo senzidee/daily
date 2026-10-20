@@ -2,12 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'package:daylog/data/app_database.dart';
 import 'package:daylog/main.dart';
+import 'package:daylog/providers/database_provider.dart';
+import 'package:drift/native.dart';
 
 void main() {
   testWidgets('shell builds and next-day control changes the selected day',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const ProviderScope(child: MyApp()));
+    final db = AppDatabase(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [databaseProvider.overrideWithValue(db)],
+        child: const MyApp(),
+      ),
+    );
+    await tester.pumpAndSettle();
 
     expect(find.byType(NavigationBar), findsOneWidget);
 
