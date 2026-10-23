@@ -6,6 +6,10 @@ import '../domain/diary_entry.dart';
 import '../providers/diary_providers.dart';
 import '../providers/selected_day_provider.dart';
 import 'format.dart';
+import 'theme/app_spacing.dart';
+import 'widgets/app_card.dart';
+import 'widgets/app_empty_state.dart';
+import 'widgets/app_section_label.dart';
 
 class DiaryTab extends ConsumerWidget {
   const DiaryTab({super.key});
@@ -18,17 +22,19 @@ class DiaryTab extends ConsumerWidget {
     return Column(
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-          child: Row(
-            children: [
-              Text('Entries', style: Theme.of(context).textTheme.titleMedium),
-              const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.add),
-                tooltip: 'Add entry',
-                onPressed: () => _addEntry(context, ref),
-              ),
-            ],
+          padding: const EdgeInsets.fromLTRB(
+            AppSpacing.md,
+            AppSpacing.sm,
+            AppSpacing.xs,
+            AppSpacing.xs,
+          ),
+          child: AppSectionLabel(
+            'Entries',
+            trailing: IconButton(
+              icon: const Icon(Icons.add),
+              tooltip: 'Add entry',
+              onPressed: () => _addEntry(context, ref),
+            ),
           ),
         ),
         Expanded(
@@ -52,23 +58,30 @@ class DiaryTab extends ConsumerWidget {
       ..sort((a, b) => a.occurredAt.compareTo(b.occurredAt));
 
     if (forDay.isEmpty) {
-      return const Center(child: Text('No entries for this day'));
+      return const AppEmptyState(
+        icon: Icons.menu_book_outlined,
+        message: 'No entries for this day',
+      );
     }
 
     return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.xs,
+        AppSpacing.md,
+        AppSpacing.xl,
+      ),
       itemCount: forDay.length,
       itemBuilder: (context, index) {
         final entry = forDay[index];
-        return ListTile(
-          title: Text(entry.text ?? ''),
-          subtitle: Text(formatTime(entry.occurredAt)),
-          trailing: IconButton(
-            icon: const Icon(Icons.delete_outline),
-            tooltip: 'Delete entry',
-            onPressed: () =>
+        return Padding(
+          padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+          child: _EntryCard(
+            entry: entry,
+            onTap: () => _editEntry(context, ref, entry),
+            onDelete: () =>
                 ref.read(diaryEntriesProvider.notifier).delete(entry.id!),
           ),
-          onTap: () => _editEntry(context, ref, entry),
         );
       },
     );
@@ -81,10 +94,9 @@ class DiaryTab extends ConsumerWidget {
     );
     if (form == null) return;
 
-    await ref.read(diaryEntriesProvider.notifier).add(
-          occurredAt: form.occurredAt,
-          text: form.text,
-        );
+    await ref
+        .read(diaryEntriesProvider.notifier)
+        .add(occurredAt: form.occurredAt, text: form.text);
   }
 
   Future<void> _editEntry(
@@ -98,7 +110,9 @@ class DiaryTab extends ConsumerWidget {
     );
     if (form == null) return;
 
-    await ref.read(diaryEntriesProvider.notifier).updateEntry(
+    await ref
+        .read(diaryEntriesProvider.notifier)
+        .updateEntry(
           DiaryEntry(
             id: entry.id,
             occurredAt: form.occurredAt,
@@ -106,6 +120,68 @@ class DiaryTab extends ConsumerWidget {
             audioPath: entry.audioPath,
           ),
         );
+  }
+}
+
+class _EntryCard extends StatelessWidget {
+  const _EntryCard({
+    required this.entry,
+    required this.onTap,
+    required this.onDelete,
+  });
+
+  final DiaryEntry entry;
+  final VoidCallback onTap;
+  final VoidCallback onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return AppCard(
+      onTap: onTap,
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.xxs,
+        AppSpacing.sm,
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xs,
+              vertical: AppSpacing.xxs,
+            ),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+            child: Text(
+              formatTime(entry.occurredAt),
+              style: textTheme.labelSmall?.copyWith(
+                color: scheme.onPrimaryContainer,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xxs),
+              child: Text(entry.text ?? '', style: textTheme.bodyLarge),
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, size: 20),
+            tooltip: 'Delete entry',
+            color: scheme.onSurfaceVariant,
+            onPressed: onDelete,
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -159,8 +235,13 @@ class _EntryDialogState extends State<_EntryDialog> {
     if (time == null) return;
 
     setState(() {
-      _occurredAt =
-          DateTime(date.year, date.month, date.day, time.hour, time.minute);
+      _occurredAt = DateTime(
+        date.year,
+        date.month,
+        date.day,
+        time.hour,
+        time.minute,
+      );
     });
   }
 
@@ -184,21 +265,17 @@ class _EntryDialogState extends State<_EntryDialog> {
             controller: _controller,
             autofocus: true,
             maxLines: 3,
-            decoration: InputDecoration(
-              labelText: 'Text',
-              errorText: _error,
-            ),
+            decoration: InputDecoration(labelText: 'Text', errorText: _error),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(child: Text('${formatDate(_occurredAt)} ${formatTime(_occurredAt)}')),
-              TextButton.icon(
-                onPressed: _pickDateTime,
-                icon: const Icon(Icons.schedule),
-                label: const Text('Time'),
-              ),
-            ],
+          const SizedBox(height: AppSpacing.sm),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            leading: const Icon(Icons.schedule),
+            title: const Text('Time'),
+            subtitle: Text(
+              '${formatDate(_occurredAt)} ${formatTime(_occurredAt)}',
+            ),
+            onTap: _pickDateTime,
           ),
         ],
       ),
@@ -207,10 +284,7 @@ class _EntryDialogState extends State<_EntryDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: _save,
-          child: const Text('Save'),
-        ),
+        FilledButton(onPressed: _save, child: const Text('Save')),
       ],
     );
   }

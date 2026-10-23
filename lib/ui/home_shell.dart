@@ -6,18 +6,24 @@ import 'diary_tab.dart';
 import 'meals_tab.dart';
 import 'metrics_tab.dart';
 import 'summary_tab.dart';
+import 'theme/app_spacing.dart';
+import 'widgets/app_floating_nav.dart';
+import 'widgets/app_radial_background.dart';
 
 class HomeShell extends ConsumerWidget {
   const HomeShell({super.key});
 
+  /// Key for the selected-day title, used by widget tests.
+  static const dayTitleKey = Key('day-title');
+
   static const _weekdays = [
-    'Mon',
-    'Tue',
-    'Wed',
-    'Thu',
-    'Fri',
-    'Sat',
-    'Sun',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
   static const _months = [
@@ -42,31 +48,49 @@ class HomeShell extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_formatDay(selectedDay)),
-        leading: IconButton(
-          icon: const Icon(Icons.chevron_left),
+        toolbarHeight: 76,
+        titleSpacing: AppSpacing.md,
+        leadingWidth: 56,
+        leading: _DayAction(
+          icon: Icons.chevron_left,
           tooltip: 'Previous day',
           onPressed: notifier.goToPreviousDay,
         ),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              _weekdays[selectedDay.weekday - 1],
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                letterSpacing: 1.1,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(_formatDay(selectedDay), key: HomeShell.dayTitleKey),
+          ],
+        ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.today),
+          _DayAction(
+            icon: Icons.today,
             tooltip: 'Today',
             onPressed: notifier.goToToday,
           ),
-          IconButton(
-            icon: const Icon(Icons.chevron_right),
+          _DayAction(
+            icon: Icons.chevron_right,
             tooltip: 'Next day',
             onPressed: notifier.goToNextDay,
           ),
-          IconButton(
-            icon: const Icon(Icons.calendar_today),
+          _DayAction(
+            icon: Icons.calendar_today,
             tooltip: 'Pick date',
             onPressed: () => _pickDate(context, selectedDay, notifier),
           ),
+          const SizedBox(width: AppSpacing.xs),
         ],
       ),
-      body: const _TabbedBody(),
+      body: const AppRadialBackground(child: _TabbedBody()),
     );
   }
 
@@ -87,8 +111,36 @@ class HomeShell extends ConsumerWidget {
   }
 
   static String _formatDay(DateTime day) {
-    return '${_weekdays[day.weekday - 1]}, '
-        '${_months[day.month - 1]} ${day.day}, ${day.year}';
+    return '${_months[day.month - 1]} ${day.day}, ${day.year}';
+  }
+}
+
+class _DayAction extends StatelessWidget {
+  const _DayAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return IconButton(
+      icon: Icon(icon, size: 20),
+      tooltip: tooltip,
+      onPressed: onPressed,
+      style: IconButton.styleFrom(
+        backgroundColor: scheme.surfaceContainerHigh,
+        foregroundColor: scheme.onSurface,
+        minimumSize: const Size(40, 40),
+        shape: const CircleBorder(),
+      ),
+    );
   }
 }
 
@@ -109,36 +161,42 @@ class _TabbedBodyState extends State<_TabbedBody> {
     SummaryTab(),
   ];
 
+  static const _destinations = <AppNavDestination>[
+    AppNavDestination(
+      icon: Icons.book_outlined,
+      selectedIcon: Icons.book,
+      label: 'Diary',
+    ),
+    AppNavDestination(
+      icon: Icons.straighten_outlined,
+      selectedIcon: Icons.straighten,
+      label: 'Metrics',
+    ),
+    AppNavDestination(
+      icon: Icons.restaurant_outlined,
+      selectedIcon: Icons.restaurant,
+      label: 'Meals',
+    ),
+    AppNavDestination(
+      icon: Icons.pie_chart_outline,
+      selectedIcon: Icons.pie_chart,
+      label: 'Summary',
+    ),
+  ];
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: IndexedStack(index: _index, children: _tabs),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _index,
-        onDestinationSelected: (index) => setState(() => _index = index),
-        destinations: const [
-          NavigationDestination(
-            icon: Icon(Icons.book_outlined),
-            selectedIcon: Icon(Icons.book),
-            label: 'Diary',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.straighten_outlined),
-            selectedIcon: Icon(Icons.straighten),
-            label: 'Metrics',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.restaurant_outlined),
-            selectedIcon: Icon(Icons.restaurant),
-            label: 'Meals',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.pie_chart_outline),
-            selectedIcon: Icon(Icons.pie_chart),
-            label: 'Summary',
-          ),
-        ],
-      ),
+    return Column(
+      children: [
+        Expanded(
+          child: IndexedStack(index: _index, children: _tabs),
+        ),
+        AppFloatingNav(
+          index: _index,
+          onChanged: (index) => setState(() => _index = index),
+          destinations: _destinations,
+        ),
+      ],
     );
   }
 }

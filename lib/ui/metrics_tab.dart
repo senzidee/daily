@@ -9,6 +9,11 @@ import '../domain/metric.dart';
 import '../providers/metric_providers.dart';
 import '../providers/selected_day_provider.dart';
 import 'format.dart';
+import 'theme/app_palette.dart';
+import 'theme/app_spacing.dart';
+import 'widgets/app_card.dart';
+import 'widgets/app_empty_state.dart';
+import 'widgets/app_section_label.dart';
 
 class MetricsTab extends ConsumerWidget {
   const MetricsTab({super.key});
@@ -23,19 +28,37 @@ class MetricsTab extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Error: $error')),
       data: (metrics) {
-        final measurements =
-            measurementsAsync.value ?? const <Measurement>[];
+        final measurements = measurementsAsync.value ?? const <Measurement>[];
+        final palette = AppPalette.of(context);
 
         return Scaffold(
+          backgroundColor: Colors.transparent,
           body: metrics.isEmpty
-              ? const Center(child: Text('No metrics yet'))
+              ? const AppEmptyState(
+                  icon: Icons.straighten_outlined,
+                  message: 'No metrics yet',
+                )
               : ListView(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.md,
+                    AppSpacing.sm,
+                    AppSpacing.md,
+                    AppSpacing.xxxl * 2,
+                  ),
                   children: [
-                    for (final metric in metrics)
-                      _MetricTile(
-                        metric: metric,
-                        day: day,
-                        measurements: measurements,
+                    const AppSectionLabel('Metrics'),
+                    const SizedBox(height: AppSpacing.xs),
+                    for (var i = 0; i < metrics.length; i++)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                        child: _MetricTile(
+                          metric: metrics[i],
+                          day: day,
+                          measurements: measurements,
+                          accent: palette
+                              .cardGradients[i % palette.cardGradients.length]
+                              .first,
+                        ),
                       ),
                   ],
                 ),
@@ -62,45 +85,101 @@ class _MetricTile extends StatelessWidget {
     required this.metric,
     required this.day,
     required this.measurements,
+    required this.accent,
   });
 
   final Metric metric;
   final DateTime day;
   final List<Measurement> measurements;
+  final Color accent;
 
   @override
   Widget build(BuildContext context) {
-    final dayMeasurements = measurements
-        .where((m) => m.metricId == metric.id && isSameDay(m.recordedAt, day))
-        .toList()
-      ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    final dayMeasurements =
+        measurements
+            .where(
+              (m) => m.metricId == metric.id && isSameDay(m.recordedAt, day),
+            )
+            .toList()
+          ..sort((a, b) => a.recordedAt.compareTo(b.recordedAt));
 
     final aggregate = aggregateMetric(dayMeasurements, metric.aggregationMode);
 
-    return ExpansionTile(
-      key: ValueKey(metric.id),
-      title: Text(metric.name),
-      subtitle: Text('${metric.unit} · ${metric.aggregationMode.name}'),
-      childrenPadding: const EdgeInsets.symmetric(horizontal: 16),
-      expandedCrossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: dayMeasurements.isEmpty
-              ? const Text('No measurements for this day')
-              : Text(
-                  '${metric.aggregationMode.name}: '
-                  '${formatValue(aggregate)} ${metric.unit}',
-                ),
-        ),
-        for (final m in dayMeasurements)
-          ListTile(
-            dense: true,
-            title: Text('${formatValue(m.value)} ${metric.unit}'),
-            subtitle: Text(formatTime(m.recordedAt)),
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Theme(
+        data: Theme.of(context).copyWith(
+          dividerColor: Colors.transparent,
+          expansionTileTheme: Theme.of(context).expansionTileTheme.copyWith(
+            shape: const Border(),
+            collapsedShape: const Border(),
+            tilePadding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.md,
+              vertical: AppSpacing.xxs,
+            ),
           ),
-        _AddMeasurementForm(metricId: metric.id!, day: day),
-      ],
+        ),
+        child: ExpansionTile(
+          key: ValueKey(metric.id),
+          title: Text(metric.name, style: textTheme.titleMedium),
+          subtitle: Text('${metric.unit} · ${metric.aggregationMode.name}'),
+          leading: Container(
+            width: 4,
+            height: 32,
+            decoration: BoxDecoration(
+              color: accent,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+          ),
+          children: [
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                '${metric.aggregationMode.name}: '
+                '${formatValue(aggregate)} ${metric.unit}',
+                style: textTheme.titleMedium?.copyWith(color: accent),
+              ),
+            ),
+            if (dayMeasurements.isEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: AppSpacing.xs),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'No measurements for this day',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              )
+            else
+              for (final m in dayMeasurements)
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+                  child: Row(
+                    children: [
+                      Text(
+                        formatTime(m.recordedAt),
+                        style: textTheme.labelSmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(width: AppSpacing.sm),
+                      Text(
+                        '${formatValue(m.value)} ${metric.unit}',
+                        style: textTheme.bodyMedium,
+                      ),
+                    ],
+                  ),
+                ),
+            _AddMeasurementForm(metricId: metric.id!, day: day),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -146,10 +225,12 @@ class _AddMetricDialogState extends ConsumerState<_AddMetricDialog> {
             controller: _nameController,
             decoration: const InputDecoration(labelText: 'Name'),
           ),
+          const SizedBox(height: AppSpacing.sm),
           TextField(
             controller: _unitController,
             decoration: const InputDecoration(labelText: 'Unit'),
           ),
+          const SizedBox(height: AppSpacing.sm),
           DropdownButtonFormField<AggregationMode>(
             initialValue: _mode,
             decoration: const InputDecoration(labelText: 'Aggregation'),
@@ -170,10 +251,7 @@ class _AddMetricDialogState extends ConsumerState<_AddMetricDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(
-          onPressed: _submit,
-          child: const Text('Add'),
-        ),
+        FilledButton(onPressed: _submit, child: const Text('Add')),
       ],
     );
   }
@@ -236,18 +314,22 @@ class _AddMeasurementFormState extends ConsumerState<_AddMeasurementForm> {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(top: AppSpacing.sm),
       child: Row(
         children: [
           Expanded(
             child: TextField(
               controller: _valueController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
+              decoration: InputDecoration(
                 labelText: 'Value',
                 isDense: true,
+                fillColor: scheme.surfaceContainerHighest,
               ),
             ),
           ),
@@ -256,10 +338,7 @@ class _AddMeasurementFormState extends ConsumerState<_AddMeasurementForm> {
             tooltip: 'Pick time',
             onPressed: _pickTime,
           ),
-          FilledButton(
-            onPressed: _submit,
-            child: const Text('Add'),
-          ),
+          FilledButton(onPressed: _submit, child: const Text('Add')),
         ],
       ),
     );

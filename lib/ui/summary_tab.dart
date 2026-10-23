@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../domain/daily_summary.dart';
 import '../domain/macros.dart';
 import '../domain/nutrition_goal.dart';
 import '../providers/daily_summary_provider.dart';
 import '../providers/goal_providers.dart';
 import 'format.dart';
+import 'theme/app_palette.dart';
+import 'theme/app_spacing.dart';
+import 'widgets/app_card.dart';
+import 'widgets/app_section_label.dart';
 
 class SummaryTab extends ConsumerWidget {
   const SummaryTab({super.key});
@@ -18,33 +23,24 @@ class SummaryTab extends ConsumerWidget {
       loading: () => const Center(child: CircularProgressIndicator()),
       error: (error, _) => Center(child: Text('Error: $error')),
       data: (summary) => ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.md,
+          AppSpacing.sm,
+          AppSpacing.md,
+          AppSpacing.xl,
+        ),
         children: [
-          _GoalCard(
-            goal: summary.goal,
-            consumed: summary.consumedMacros,
-          ),
-          const SizedBox(height: 16),
-          const _SectionHeader('Metrics'),
+          _GoalCard(goal: summary.goal, consumed: summary.consumedMacros),
+          const SizedBox(height: AppSpacing.lg),
+          const AppSectionLabel('Metrics'),
+          const SizedBox(height: AppSpacing.xs),
           if (summary.metricAggregates.isEmpty)
             const _Note('No metrics yet')
           else
-            Card(
-              child: Column(
-                children: [
-                  for (final aggregate in summary.metricAggregates)
-                    ListTile(
-                      title: Text(
-                        '${aggregate.metric.name}: '
-                        '${formatValue(aggregate.value)} ${aggregate.metric.unit}',
-                      ),
-                      subtitle: Text(aggregate.metric.aggregationMode.name),
-                    ),
-                ],
-              ),
-            ),
-          const SizedBox(height: 16),
-          const _SectionHeader('Meals'),
+            _MetricAggregates(aggregates: summary.metricAggregates),
+          const SizedBox(height: AppSpacing.lg),
+          const AppSectionLabel('Meals'),
+          const SizedBox(height: AppSpacing.xs),
           _MacrosCard(macros: summary.consumedMacros),
         ],
       ),
@@ -61,55 +57,245 @@ class _GoalCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final goal = this.goal;
+    final palette = AppPalette.of(context);
+    final gradient = palette.cardGradients.first;
+
     if (goal == null) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Goal', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              const Text('No nutrition goal set'),
-              const SizedBox(height: 8),
-              FilledButton(
-                onPressed: () => _showGoalEditor(context, null),
-                child: const Text('Set goal'),
-              ),
-            ],
-          ),
+      return AppCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Goal', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'No nutrition goal set',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            FilledButton(
+              onPressed: () => _showGoalEditor(context, null),
+              child: const Text('Set goal'),
+            ),
+          ],
         ),
       );
     }
 
     final targets = goal.gramTargets;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
+    final ratio = goal.kcalTarget <= 0
+        ? 0.0
+        : (consumed.kcal / goal.kcalTarget).clamp(0.0, 1.0);
+
+    return AppCard(
+      gradient: gradient,
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      child: DefaultTextStyle(
+        style: const TextStyle(color: Colors.white),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Goal', style: Theme.of(context).textTheme.titleMedium),
-                const Spacer(),
-                TextButton(
-                  onPressed: () => _showGoalEditor(context, goal),
-                  child: const Text('Edit goal'),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          const Text(
+                            'Goal',
+                            style: TextStyle(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const Spacer(),
+                          TextButton(
+                            onPressed: () => _showGoalEditor(context, goal),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Edit goal'),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '${formatValue(goal.kcalTarget)} kcal target',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 15,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpacing.xs),
+                      Text(
+                        _remainingLabel(consumed.kcal, goal.kcalTarget),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                _GoalRing(ratio: ratio),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            _GoalBar(
+              label: 'Carbs',
+              consumed: consumed.carbs,
+              target: targets.carbs,
+              color: palette.carbs,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _GoalBar(
+              label: 'Protein',
+              consumed: consumed.protein,
+              target: targets.protein,
+              color: palette.protein,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            _GoalBar(
+              label: 'Fat',
+              consumed: consumed.fat,
+              target: targets.fat,
+              color: palette.fat,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _GoalRing extends StatelessWidget {
+  const _GoalRing({required this.ratio});
+
+  final double ratio;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 76,
+      height: 76,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          SizedBox(
+            width: 76,
+            height: 76,
+            child: CircularProgressIndicator(
+              value: ratio,
+              strokeWidth: 7,
+              backgroundColor: Colors.white24,
+              color: Colors.white,
+            ),
+          ),
+          Text(
+            '${(ratio * 100).round()}%',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GoalBar extends StatelessWidget {
+  const _GoalBar({
+    required this.label,
+    required this.consumed,
+    required this.target,
+    required this.color,
+  });
+
+  final String label;
+  final double consumed;
+  final double target;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = target <= 0 ? 0.0 : (consumed / target).clamp(0.0, 1.0);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          _macroRemainingLabel(label, consumed, target),
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        ClipRRect(
+          borderRadius: BorderRadius.circular(AppRadius.pill),
+          child: LinearProgressIndicator(
+            value: ratio,
+            minHeight: 6,
+            backgroundColor: Colors.white24,
+            color: color,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MetricAggregates extends StatelessWidget {
+  const _MetricAggregates({required this.aggregates});
+
+  final List<MetricAggregate> aggregates;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
+
+    return AppCard(
+      child: Column(
+        children: [
+          for (var i = 0; i < aggregates.length; i++) ...[
+            if (i > 0) const Divider(height: AppSpacing.lg),
+            Row(
+              children: [
+                Container(
+                  width: 8,
+                  height: 8,
+                  decoration: BoxDecoration(
+                    color: palette
+                        .cardGradients[i % palette.cardGradients.length]
+                        .first,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '${aggregates[i].metric.name}: '
+                        '${formatValue(aggregates[i].value)} '
+                        '${aggregates[i].metric.unit}',
+                        style: Theme.of(context).textTheme.titleSmall,
+                      ),
+                      Text(
+                        aggregates[i].metric.aggregationMode.name,
+                        style: Theme.of(context).textTheme.bodySmall
+                            ?.copyWith(color: scheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text('${formatValue(goal.kcalTarget)} kcal target'),
-            const SizedBox(height: 8),
-            Text(_macroRemainingLabel('Carbs', consumed.carbs, targets.carbs)),
-            Text(_macroRemainingLabel(
-                'Protein', consumed.protein, targets.protein)),
-            Text(_macroRemainingLabel('Fat', consumed.fat, targets.fat)),
-            const Divider(height: 24),
-            Text(_remainingLabel(consumed.kcal, goal.kcalTarget)),
           ],
-        ),
+        ],
       ),
     );
   }
@@ -122,37 +308,83 @@ class _MacrosCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('${formatValue(macros.kcal)} kcal'),
-            const SizedBox(height: 8),
-            Text('Carbs ${formatValue(macros.carbs)} g'),
-            Text('Protein ${formatValue(macros.protein)} g'),
-            Text('Fat ${formatValue(macros.fat)} g'),
-          ],
-        ),
+    final palette = AppPalette.of(context);
+    final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '${formatValue(macros.kcal)} kcal',
+            style: textTheme.headlineSmall,
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Row(
+            children: [
+              Expanded(
+                child: _MacroStat(
+                  label: 'Carbs',
+                  grams: macros.carbs,
+                  color: palette.carbs,
+                  mutedColor: scheme.onSurfaceVariant,
+                ),
+              ),
+              Expanded(
+                child: _MacroStat(
+                  label: 'Protein',
+                  grams: macros.protein,
+                  color: palette.protein,
+                  mutedColor: scheme.onSurfaceVariant,
+                ),
+              ),
+              Expanded(
+                child: _MacroStat(
+                  label: 'Fat',
+                  grams: macros.fat,
+                  color: palette.fat,
+                  mutedColor: scheme.onSurfaceVariant,
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title);
+class _MacroStat extends StatelessWidget {
+  const _MacroStat({
+    required this.label,
+    required this.grams,
+    required this.color,
+    required this.mutedColor,
+  });
 
-  final String title;
+  final String label;
+  final double grams;
+  final Color color;
+  final Color mutedColor;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-      ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall
+              ?.copyWith(color: mutedColor),
+        ),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          '${formatValue(grams)} g',
+          style: Theme.of(context).textTheme.titleMedium
+              ?.copyWith(color: color),
+        ),
+      ],
     );
   }
 }
@@ -164,9 +396,10 @@ class _Note extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: Text(message),
+    return Text(
+      message,
+      style: Theme.of(context).textTheme.bodyMedium
+          ?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
     );
   }
 }
@@ -256,7 +489,9 @@ class _GoalEditorDialogState extends ConsumerState<_GoalEditorDialog> {
     });
 
     try {
-      await ref.read(nutritionGoalProvider.notifier).save(
+      await ref
+          .read(nutritionGoalProvider.notifier)
+          .save(
             NutritionGoal(
               kcalTarget: kcal,
               carbPercent: carbs,
@@ -289,30 +524,37 @@ class _GoalEditorDialogState extends ConsumerState<_GoalEditorDialog> {
           children: [
             TextField(
               controller: _kcalController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(labelText: 'Kcal target'),
             ),
+            const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _carbsController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(labelText: 'Carbs %'),
             ),
+            const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _proteinController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(labelText: 'Protein %'),
             ),
+            const SizedBox(height: AppSpacing.sm),
             TextField(
               controller: _fatController,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: const TextInputType.numberWithOptions(
+                decimal: true,
+              ),
               decoration: const InputDecoration(labelText: 'Fat %'),
             ),
             if (_error != null) ...[
-              const SizedBox(height: 12),
+              const SizedBox(height: AppSpacing.sm),
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(

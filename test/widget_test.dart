@@ -6,10 +6,13 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:daylog/data/app_database.dart';
 import 'package:daylog/main.dart';
 import 'package:daylog/providers/database_provider.dart';
+import 'package:daylog/ui/home_shell.dart';
+import 'package:daylog/ui/widgets/app_floating_nav.dart';
 
 void main() {
-  testWidgets('shell builds and next-day control changes the selected day',
-      (WidgetTester tester) async {
+  testWidgets('shell builds and next-day control changes the selected day', (
+    WidgetTester tester,
+  ) async {
     final db = AppDatabase(NativeDatabase.memory());
     addTearDown(db.close);
 
@@ -21,18 +24,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.byType(NavigationBar), findsOneWidget);
+    expect(find.byType(AppFloatingNav), findsOneWidget);
 
-    final appBarTitle = find.descendant(
-      of: find.byType(AppBar),
-      matching: find.byType(Text),
-    );
-    final before = tester.widget<Text>(appBarTitle).data;
+    final dayTitle = find.byKey(HomeShell.dayTitleKey);
+    final before = tester.widget<Text>(dayTitle).data;
 
     await tester.tap(find.byIcon(Icons.chevron_right));
     await tester.pump();
 
-    final after = tester.widget<Text>(appBarTitle).data;
+    final after = tester.widget<Text>(dayTitle).data;
     expect(after, isNot(before));
   });
 }

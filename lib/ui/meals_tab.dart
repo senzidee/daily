@@ -11,6 +11,12 @@ import '../providers/food_providers.dart';
 import '../providers/meal_providers.dart';
 import '../providers/selected_day_provider.dart';
 import 'format.dart';
+import 'theme/app_palette.dart';
+import 'theme/app_spacing.dart';
+import 'widgets/app_card.dart';
+import 'widgets/app_empty_state.dart';
+import 'widgets/app_search_field.dart';
+import 'widgets/app_section_label.dart';
 
 final _foodQueryProvider = NotifierProvider<_FoodQueryNotifier, String>(
   _FoodQueryNotifier.new,
@@ -31,23 +37,33 @@ class MealsTab extends ConsumerWidget {
     final query = ref.watch(_foodQueryProvider);
     return CustomScrollView(
       slivers: [
-        const SliverToBoxAdapter(child: _SearchField()),
+        const SliverToBoxAdapter(child: _SearchHeader()),
         if (query.trim().isNotEmpty) _SearchResults(query: query),
-        const SliverToBoxAdapter(child: _SectionHeader('Meals')),
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.md,
+              AppSpacing.xs,
+            ),
+            child: AppSectionLabel('Meals'),
+          ),
+        ),
         const _DayMealsList(),
       ],
     );
   }
 }
 
-class _SearchField extends ConsumerStatefulWidget {
-  const _SearchField();
+class _SearchHeader extends ConsumerStatefulWidget {
+  const _SearchHeader();
 
   @override
-  ConsumerState<_SearchField> createState() => _SearchFieldState();
+  ConsumerState<_SearchHeader> createState() => _SearchHeaderState();
 }
 
-class _SearchFieldState extends ConsumerState<_SearchField> {
+class _SearchHeaderState extends ConsumerState<_SearchHeader> {
   final _controller = TextEditingController();
   Timer? _debounce;
 
@@ -68,16 +84,16 @@ class _SearchFieldState extends ConsumerState<_SearchField> {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(16),
-      child: TextField(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.xs,
+      ),
+      child: AppSearchField(
         controller: _controller,
+        hintText: 'Search foods',
         onChanged: _onChanged,
-        textInputAction: TextInputAction.search,
-        decoration: const InputDecoration(
-          prefixIcon: Icon(Icons.search),
-          hintText: 'Search foods',
-          border: OutlineInputBorder(),
-        ),
       ),
     );
   }
@@ -94,29 +110,46 @@ class _SearchResults extends ConsumerWidget {
     return results.when(
       data: (foods) {
         if (foods.isEmpty) {
-          return const SliverToBoxAdapter(child: _CenteredNote('No foods found'));
+          return const SliverToBoxAdapter(
+            child: AppEmptyState(
+              icon: Icons.search_off,
+              message: 'No foods found',
+            ),
+          );
         }
         return SliverList.builder(
           itemCount: foods.length,
           itemBuilder: (context, index) {
             final food = foods[index];
-            return ListTile(
-              title: Text(food.name),
-              subtitle: Text(_macrosLabel(food.per100g)),
-              trailing: const Icon(Icons.add_circle_outline),
-              onTap: () => _showLogMealDialog(
-                context,
-                food,
-                ref.read(selectedDayProvider),
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(
+                AppSpacing.md,
+                0,
+                AppSpacing.md,
+                AppSpacing.xs,
+              ),
+              child: AppCard(
+                padding: EdgeInsets.zero,
+                child: ListTile(
+                  leading: const Icon(Icons.add_circle_outline),
+                  title: Text(food.name),
+                  subtitle: Text(_macrosLabel(food.per100g)),
+                  trailing: const Icon(Icons.add),
+                  onTap: () => _showLogMealDialog(
+                    context,
+                    food,
+                    ref.read(selectedDayProvider),
+                  ),
+                ),
               ),
             );
           },
         );
       },
-      loading: () => const SliverToBoxAdapter(child: _CenteredNote('Searching…')),
-      error: (error, _) => SliverToBoxAdapter(
-        child: _CenteredNote('Search failed: $error'),
-      ),
+      loading: () =>
+          const SliverToBoxAdapter(child: _CenteredNote('Searching…')),
+      error: (error, _) =>
+          SliverToBoxAdapter(child: _CenteredNote('Search failed: $error')),
     );
   }
 }
@@ -131,29 +164,43 @@ class _DayMealsList extends ConsumerWidget {
 
     return mealsAsync.when(
       data: (meals) {
-        final todaysMeals =
-            meals.where((m) => isSameDay(m.consumedAt, day)).toList();
+        final todaysMeals = meals
+            .where((m) => isSameDay(m.consumedAt, day))
+            .toList();
         if (todaysMeals.isEmpty) {
           return const SliverToBoxAdapter(
-            child: _CenteredNote('No meals logged yet'),
+            child: AppEmptyState(
+              icon: Icons.restaurant_outlined,
+              message: 'No meals logged yet',
+            ),
           );
         }
         return SliverList.builder(
           itemCount: todaysMeals.length,
-          itemBuilder: (context, index) => _MealTile(meal: todaysMeals[index]),
+          itemBuilder: (context, index) => Padding(
+            padding: const EdgeInsets.fromLTRB(
+              AppSpacing.md,
+              0,
+              AppSpacing.md,
+              AppSpacing.sm,
+            ),
+            child: _MealTile(meal: todaysMeals[index], index: index),
+          ),
         );
       },
       loading: () => const SliverToBoxAdapter(child: _CenteredNote('Loading…')),
-      error: (error, _) =>
-          SliverToBoxAdapter(child: _CenteredNote('Failed to load meals: $error')),
+      error: (error, _) => SliverToBoxAdapter(
+        child: _CenteredNote('Failed to load meals: $error'),
+      ),
     );
   }
 }
 
 class _MealTile extends ConsumerWidget {
-  const _MealTile({required this.meal});
+  const _MealTile({required this.meal, required this.index});
 
   final Meal meal;
+  final int index;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -162,15 +209,22 @@ class _MealTile extends ConsumerWidget {
       data: (food) => food?.name ?? 'Food #${meal.foodId}',
       orElse: () => 'Food #${meal.foodId}',
     );
+    final scheme = Theme.of(context).colorScheme;
+    final palette = AppPalette.of(context);
+    final accent =
+        palette.cardGradients[index % palette.cardGradients.length].first;
 
     return Dismissible(
       key: ValueKey(meal.id),
       direction: DismissDirection.endToStart,
       background: Container(
-        color: Theme.of(context).colorScheme.error,
+        decoration: BoxDecoration(
+          color: scheme.errorContainer,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
         alignment: Alignment.centerRight,
-        padding: const EdgeInsets.only(right: 16),
-        child: const Icon(Icons.delete, color: Colors.white),
+        padding: const EdgeInsets.only(right: AppSpacing.lg),
+        child: Icon(Icons.delete, color: scheme.onErrorContainer),
       ),
       onDismissed: (_) {
         final id = meal.id;
@@ -178,19 +232,32 @@ class _MealTile extends ConsumerWidget {
           ref.read(mealsProvider.notifier).delete(id);
         }
       },
-      child: ListTile(
-        title: Text(name),
-        isThreeLine: true,
-        subtitle: Text(
-          '${formatValue(meal.grams)} g · ${formatValue(meal.macros.kcal)} kcal\n'
-          'C ${formatValue(meal.macros.carbs)} · '
-          'P ${formatValue(meal.macros.protein)} · '
-          'F ${formatValue(meal.macros.fat)}',
-        ),
-        onTap: () => _showEditMealDialog(
-          context,
-          meal,
-          ref.read(selectedDayProvider),
+      child: AppCard(
+        padding: EdgeInsets.zero,
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.xs,
+          ),
+          leading: Container(
+            width: 4,
+            height: 40,
+            decoration: BoxDecoration(
+              color: accent,
+              borderRadius: BorderRadius.circular(AppRadius.pill),
+            ),
+          ),
+          title: Text(name),
+          isThreeLine: true,
+          subtitle: Text(
+            '${formatValue(meal.grams)} g · ${formatValue(meal.macros.kcal)} kcal\n'
+            'C ${formatValue(meal.macros.carbs)} · '
+            'P ${formatValue(meal.macros.protein)} · '
+            'F ${formatValue(meal.macros.fat)}',
+          ),
+          trailing: Icon(Icons.chevron_right, color: scheme.onSurfaceVariant),
+          onTap: () =>
+              _showEditMealDialog(context, meal, ref.read(selectedDayProvider)),
         ),
       ),
     );
@@ -248,44 +315,49 @@ class _LogMealDialogState extends ConsumerState<_LogMealDialog> {
 
     return AlertDialog(
       title: Text('Log ${widget.food.name}'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _gramsController,
-            keyboardType: TextInputType.number,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              labelText: 'Grams',
-              hintText: 'e.g. 150',
-              errorText: _gramsController.text.isNotEmpty && !valid
-                  ? 'Enter a number greater than 0'
-                  : null,
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _gramsController,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Grams',
+                hintText: 'e.g. 150',
+                errorText: _gramsController.text.isNotEmpty && !valid
+                    ? 'Enter a number greater than 0'
+                    : null,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.calendar_today),
-            title: const Text('Date'),
-            subtitle: Text(formatDate(_consumedAt)),
-            onTap: _pickDate,
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.schedule),
-            title: const Text('Time'),
-            subtitle: Text(formatTime(_consumedAt)),
-            onTap: _pickTime,
-          ),
-          if (preview != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _macrosLabel(preview),
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: AppSpacing.sm),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.calendar_today),
+              title: const Text('Date'),
+              subtitle: Text(formatDate(_consumedAt)),
+              onTap: _pickDate,
             ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.schedule),
+              title: const Text('Time'),
+              subtitle: Text(formatTime(_consumedAt)),
+              onTap: _pickTime,
+            ),
+            if (preview != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _macrosLabel(preview),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -344,11 +416,9 @@ class _LogMealDialogState extends ConsumerState<_LogMealDialog> {
       return;
     }
     setState(() => _submitting = true);
-    await ref.read(mealsProvider.notifier).add(
-          food: widget.food,
-          grams: grams,
-          consumedAt: _consumedAt,
-        );
+    await ref
+        .read(mealsProvider.notifier)
+        .add(food: widget.food, grams: grams, consumedAt: _consumedAt);
     if (mounted) {
       Navigator.of(context).pop();
     }
@@ -356,7 +426,10 @@ class _LogMealDialogState extends ConsumerState<_LogMealDialog> {
 }
 
 Future<void> _showEditMealDialog(
-    BuildContext context, Meal meal, DateTime day) {
+  BuildContext context,
+  Meal meal,
+  DateTime day,
+) {
   return showDialog<void>(
     context: context,
     builder: (context) => _EditMealDialog(meal: meal, day: day),
@@ -374,8 +447,9 @@ class _EditMealDialog extends ConsumerStatefulWidget {
 }
 
 class _EditMealDialogState extends ConsumerState<_EditMealDialog> {
-  late final TextEditingController _gramsController =
-      TextEditingController(text: formatValue(widget.meal.grams));
+  late final TextEditingController _gramsController = TextEditingController(
+    text: formatValue(widget.meal.grams),
+  );
   late DateTime _consumedAt = DateTime(
     widget.day.year,
     widget.day.month,
@@ -413,43 +487,48 @@ class _EditMealDialogState extends ConsumerState<_EditMealDialog> {
           orElse: () => 'Edit meal',
         ),
       ),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _gramsController,
-            keyboardType: TextInputType.number,
-            onChanged: (_) => setState(() {}),
-            decoration: InputDecoration(
-              labelText: 'Grams',
-              errorText: _gramsController.text.isNotEmpty && !valid
-                  ? 'Enter a number greater than 0'
-                  : null,
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _gramsController,
+              keyboardType: TextInputType.number,
+              onChanged: (_) => setState(() {}),
+              decoration: InputDecoration(
+                labelText: 'Grams',
+                errorText: _gramsController.text.isNotEmpty && !valid
+                    ? 'Enter a number greater than 0'
+                    : null,
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.calendar_today),
-            title: const Text('Date'),
-            subtitle: Text(formatDate(_consumedAt)),
-            onTap: _pickDate,
-          ),
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.schedule),
-            title: const Text('Time'),
-            subtitle: Text(formatTime(_consumedAt)),
-            onTap: _pickTime,
-          ),
-          if (preview != null) ...[
-            const SizedBox(height: 8),
-            Text(
-              _macrosLabel(preview),
-              style: Theme.of(context).textTheme.bodySmall,
+            const SizedBox(height: AppSpacing.sm),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.calendar_today),
+              title: const Text('Date'),
+              subtitle: Text(formatDate(_consumedAt)),
+              onTap: _pickDate,
             ),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: const Icon(Icons.schedule),
+              title: const Text('Time'),
+              subtitle: Text(formatTime(_consumedAt)),
+              onTap: _pickTime,
+            ),
+            if (preview != null) ...[
+              const SizedBox(height: AppSpacing.xs),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  _macrosLabel(preview),
+                  style: Theme.of(context).textTheme.bodySmall,
+                ),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
       actions: [
         TextButton(
@@ -508,7 +587,9 @@ class _EditMealDialogState extends ConsumerState<_EditMealDialog> {
       return;
     }
     setState(() => _submitting = true);
-    await ref.read(mealsProvider.notifier).updateMeal(
+    await ref
+        .read(mealsProvider.notifier)
+        .updateMeal(
           Meal(
             id: widget.meal.id,
             foodId: widget.meal.foodId,
@@ -523,23 +604,6 @@ class _EditMealDialogState extends ConsumerState<_EditMealDialog> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader(this.title);
-
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-}
-
 class _CenteredNote extends StatelessWidget {
   const _CenteredNote(this.message);
 
@@ -548,7 +612,7 @@ class _CenteredNote extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(AppSpacing.xl),
       child: Center(
         child: Text(
           message,
