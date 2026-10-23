@@ -25,3 +25,17 @@ talks to providers, never to a repository directly.
 
 Architecture decisions are recorded as ADRs in `docs/adr/`. Read the relevant ADR
 before changing a subsystem it covers; write a new ADR for a decision of that scale.
+
+## Agent skills
+
+### Issue tracker
+
+Issues and specs live in this repo's GitHub Issues, via `gh`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Five canonical labels — `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` at the root plus `docs/adr/`. See `docs/agents/domain.md`.
