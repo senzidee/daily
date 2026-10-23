@@ -5,6 +5,7 @@ import '../providers/selected_day_provider.dart';
 import 'diary_tab.dart';
 import 'meals_tab.dart';
 import 'metrics_tab.dart';
+import 'settings_page.dart';
 import 'summary_tab.dart';
 import 'theme/app_spacing.dart';
 import 'widgets/app_floating_nav.dart';
@@ -15,6 +16,9 @@ class HomeShell extends ConsumerWidget {
 
   /// Key for the selected-day title, used by widget tests.
   static const dayTitleKey = Key('day-title');
+
+  /// Key for the settings button, used by widget tests.
+  static const settingsButtonKey = Key('settings-button');
 
   static const _weekdays = [
     'Monday',
@@ -51,7 +55,7 @@ class HomeShell extends ConsumerWidget {
         toolbarHeight: 76,
         titleSpacing: AppSpacing.md,
         leadingWidth: 56,
-        leading: _DayAction(
+        leading: _ToolbarAction(
           icon: Icons.chevron_left,
           tooltip: 'Previous day',
           onPressed: notifier.goToPreviousDay,
@@ -68,24 +72,35 @@ class HomeShell extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 2),
-            Text(_formatDay(selectedDay), key: HomeShell.dayTitleKey),
+            Text(
+              _formatDay(selectedDay),
+              key: HomeShell.dayTitleKey,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
           ],
         ),
         actions: [
-          _DayAction(
+          _ToolbarAction(
             icon: Icons.today,
             tooltip: 'Today',
             onPressed: notifier.goToToday,
           ),
-          _DayAction(
+          _ToolbarAction(
             icon: Icons.chevron_right,
             tooltip: 'Next day',
             onPressed: notifier.goToNextDay,
           ),
-          _DayAction(
+          _ToolbarAction(
             icon: Icons.calendar_today,
             tooltip: 'Pick date',
             onPressed: () => _pickDate(context, selectedDay, notifier),
+          ),
+          _ToolbarAction(
+            key: HomeShell.settingsButtonKey,
+            icon: Icons.settings_outlined,
+            tooltip: 'Settings',
+            onPressed: () => _openSettings(context),
           ),
           const SizedBox(width: AppSpacing.xs),
         ],
@@ -110,13 +125,24 @@ class HomeShell extends ConsumerWidget {
     }
   }
 
+  void _openSettings(BuildContext context) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(builder: (_) => const SettingsPage()),
+    );
+  }
+
   static String _formatDay(DateTime day) {
-    return '${_months[day.month - 1]} ${day.day}, ${day.year}';
+    final monthDay = '${_months[day.month - 1]} ${day.day}';
+    // The year only earns its width when it isn't the current one.
+    return day.year == DateTime.now().year
+        ? monthDay
+        : '$monthDay, ${day.year}';
   }
 }
 
-class _DayAction extends StatelessWidget {
-  const _DayAction({
+class _ToolbarAction extends StatelessWidget {
+  const _ToolbarAction({
+    super.key,
     required this.icon,
     required this.tooltip,
     required this.onPressed,
@@ -138,6 +164,7 @@ class _DayAction extends StatelessWidget {
         backgroundColor: scheme.surfaceContainerHigh,
         foregroundColor: scheme.onSurface,
         minimumSize: const Size(40, 40),
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
         shape: const CircleBorder(),
       ),
     );
